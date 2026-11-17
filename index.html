@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Space Invaders - Nightmare Boss Edition (v4)</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #030308;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
+    }
+    canvas { display: block; }
+
+    /* Top Left Player HUD */
+    #hud-left {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(10, 12, 24, 0.82);
+      border: 1px solid #2a3555;
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 240px;
+      backdrop-filter: blur(4px);
+    }
+    .stat-row {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .bar-bg {
+      width: 100%;
+      height: 10px;
+      background: #1a1f33;
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    #hp-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff2a55, #ff5e7e);
+      transition: width 0.15s;
+    }
+    #xp-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      transition: width 0.15s;
+    }
+    .mat-text { color: #ffd700; font-size: 16px; font-weight: 800; }
+
+    /* Top Center Wave Info */
+    #hud-center {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    #wave-title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #ff3b5c;
+      text-shadow: 0 0 12px rgba(255, 59, 92, 0.7);
+      letter-spacing: 1.5px;
+    }
+    #wave-timer {
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* Top Right Fleet Info */
+    #hud-right {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(10, 12, 24, 0.82);
+      border: 1px solid #2a3555;
+      border-radius: 8px;
+      padding: 12px 16px;
+      text-align: right;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    #hud-right div { margin-bottom: 5px; }
+    #hud-right span { color: #00f0ff; }
+
+    /* Boss Health Bar */
+    #boss-hud {
+      position: absolute;
+      top: 95px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 480px;
+      display: none;
+      text-align: center;
+    }
+    #boss-name {
+      font-size: 16px;
+      font-weight: 900;
+      color: #d946ef;
+      text-shadow: 0 0 10px rgba(217, 70, 239, 0.8);
+      margin-bottom: 5px;
+      letter-spacing: 1px;
+    }
+    #boss-bar-bg {
+      width: 100%;
+      height: 14px;
+      background: #22092c;
+      border: 2px solid #d946ef;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    #boss-bar {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #9333ea, #f43f5e);
+    }
+
+    /* Boss Warning Banner */
+    #warning-banner {
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 36px;
+      font-weight: 900;
+      color: #ff2a55;
+      text-shadow: 0 0 20px #ff0000;
+      letter-spacing: 3px;
+      display: none;
+      pointer-events: none;
+      animation: pulse 0.5s infinite alternate;
+    }
+    @keyframes pulse {
+      from { opacity: 0.4; transform: translate(-50%, -50%) scale(0.96); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+    }
+
+    /* Modals (Level Up, Shop, Game Over) */
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 6, 14, 0.88);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      backdrop-filter: blur(5px);
+    }
+    .modal-box {
+      background: #0f1424;
+      border: 2px solid #334166;
+      border-radius: 12px;
+      padding: 28px 34px;
+      max-width: 620px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+    }
+    .modal-box h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      letter-spacing: 1px;
+    }
+    .modal-sub {
+      color: #94a3b8;
+      margin-bottom: 22px;
+      font-size: 16px;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .upgrade-card {
+      background: #172038;
+      border: 1px solid #3b4d7a;
+      border-radius: 8px;
+      padding: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      color: #fff;
+    }
+    .upgrade-card:hover:not(:disabled) {
+      border-color: #00f0ff;
+      background: #1e2a4a;
+      transform: translateY(-2px);
+    }
+    .upgrade-card:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .card-title { font-size: 16px; font-weight: 800; color: #38bdf8; margin-bottom: 4px; }
+    .card-desc { font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+    .card-cost { font-size: 14px; font-weight: 800; color: #ffd700; }
+
+    .action-btn {
+      background: linear-gradient(90deg, #ff2a55, #ff5e3a);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      padding: 14px 36px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: transform 0.1s;
+    }
+    .action-btn:hover { transform: scale(1.04); }
+
+    #controls-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #64748b;
+      font-size: 13px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HUD Elements -->
+  <div id="hud-left">
+    <div class="stat-row" id="hp-text">HP: 85/85 | Armor: 0</div>
+    <div class="bar-bg"><div id="hp-bar"></div></div>
+    <div class="stat-row" id="xp-text">LEVEL 1 (0/25 XP)</div>
+    <div class="bar-bg"><div id="xp-bar"></div></div>
+    <div class="mat-text" id="mat-text">Materials: 0</div>
+  </div>
+
+  <div id="hud-center">
+    <div id="wave-title">NIGHTMARE WAVE 1</div>
+    <div id="wave-timer">25</div>
+  </div>
+
+  <div id="hud-right">
+    <div>Weapons: <span id="weapons-text">1/6</span></div>
+    <div>Enemies Alive: <span id="alive-text">0</span></div>
+    <div>Total Kills: <span id="kills-text">0</span></div>
+  </div>
+
+  <div id="boss-hud">
+    <div id="boss-name">OVERLORD SPUD CRUSHER</div>
+    <div id="boss-bar-bg"><div id="boss-bar"></div></div>
+  </div>
+
+  <div id="warning-banner">MINI-BOSS INCOMING!</div>
+
+  <!-- Level Up Modal -->
+  <div id="levelup-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h1 style="color: #38bdf8;">LEVEL UP!</h1>
+      <div class="modal-sub">Choose a minor stat boost:</div>
+      <div class="card-grid" id="levelup-options"></div>
+    </div>
+  </div>
+
+  <!-- Wave Shop Modal -->
+  <div id="shop-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h1 style="color: #4ade80;">WAVE SURVIVED!</h1>
+      <div class="modal-sub" id="shop-mat-text">Materials Available: 0</div>
+      <div class="card-grid" id="shop-options"></div>
+      <button class="action-btn" id="next-wave-btn">START WAVE 2</button>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="gameover-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h1 style="color: #ff2a55;">YOU GOT OBLITERATED!</h1>
+      <div class="modal-sub" id="gameover-stats">Survived to Wave 1 | Total Kills: 0</div>
+      <button class="action-btn" onclick="location.reload()">TRY AGAIN</button>
+    </div>
+  </div>
+
+  <div id="controls-hint">Move: A / D or Left / Right Arrows | Auto-Fires Lasers | Collect Glowing Crystals</div>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // ==========================================
+    // 1. ALL-IN-ONE CONFIG (MAP, ENEMIES, STATS)
+    // ==========================================
+    const CONFIG = {
+      map: {
+        width: 34,
+        depth: 48,
+        playerZ: 19,
+        spawnZ: -20,
+        gridColor: 0x1a2642,
+        railColor: 0x00f0ff,
+        defenseLineColor: 0xff2a55,
+        starCount: 700
+      },
+      player: {
+        startHp: 85,
+        startArmor: 0,
+        moveSpeed: 24,
+        damage: 14,
+        fireCooldown: 0.36,
+        weapons: 1,
+        maxWeapons: 6,
+        pickupRange: 5.5
+      },
+      enemies: {
+        baseHp: 22,
+        hpGrowthPerWave: 1.38,
+        baseSpeed: 3.4,
+        speedGrowthPerWave: 0.28,
+        fireChancePerSec: 0.32,
+        bulletSpeed: 15,
+        baseDamage: 12,
+        bossWaveInterval: 3,
+        bossHpMultiplier: 16
+      }
+    };
+
+    // ==========================================
+    // 2. THREE.JS SCENE & 3D ARENA MAP SETUP
+    // ==========================================
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030308, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 24, 33);
+    camera.lookAt(0, 0, 2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dirLight = new THREE.DirectionalLight(0xaaccff, 1.1);
+    dirLight.position.set(12, 28, 18);
+    scene.add(dirLight);
+
+    // Build 3D Arena Map
+    const mapGroup = new THREE.Group();
+    const gridHelper = new THREE.GridHelper(CONFIG.map.depth, 24, CONFIG.map.railColor, CONFIG.map.gridColor);
+    gridHelper.position.y = -0.6;
+    mapGroup.add(gridHelper);
+
+    // Glowing Side Rails
+    const railGeo = new THREE.BoxGeometry(0.3, 0.3, CONFIG.map.depth);
+    const railMat = new THREE.MeshBasicMaterial({ color: CONFIG.map.railColor });
+    const leftRail = new THREE.Mesh(railGeo, railMat);
+    leftRail.position.set(-CONFIG.map.width / 2, -0.4, 0);
+    const rightRail = new THREE.Mesh(railGeo, railMat);
+    rightRail.position.set(CONFIG.map.width / 2, -0.4, 0);
+    mapGroup.add(leftRail, rightRail);
+
+    // Red Defense Breach Line
+    const lineGeo = new THREE.BoxGeometry(CONFIG.map.width, 0.15, 0.25);
+    const lineMat = new THREE.MeshBasicMaterial({ color: CONFIG.map.defenseLineColor });
+    const defenseLine = new THREE.Mesh(lineGeo, lineMat);
+    defenseLine.position.set(0, -0.45, CONFIG.map.playerZ - 1.5);
+    mapGroup.add(defenseLine);
+
+    // 3D Starfield
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(CONFIG.map.starCount * 3);
+    for (let i = 0; i < CONFIG.map.starCount * 3; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 140;
+      starPos[i + 1] = (Math.random() - 0.5) * 60 - 10;
+      starPos[i + 2] = (Math.random() - 0.5) * 140;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starField = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.35 }));
+    mapGroup.add(starField);
+    scene.add(mapGroup);
+
+    // ==========================================
+    // 3. PLAYER SHIP MESH & GAME STATE
+    // ==========================================
+    const playerGroup = new THREE.Group();
+    const hullMesh = new THREE.Mesh(
+      new THREE.ConeGeometry(1.1, 2.8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x004466, roughness: 0.3 })
+    );
+    hullMesh.rotation.x = -Math.PI / 2;
+    const wingMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 0.25, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 })
+    );
+    wingMesh.position.z = 0.4;
+    playerGroup.add(hullMesh, wingMesh);
+    playerGroup.position.set(0, 0, CONFIG.map.playerZ);
+    scene.add(playerGroup);
+
+    let state = {
+      wave: 1,
+      waveTime: 25,
+      hp: CONFIG.player.startHp,
+      maxHp: CONFIG.player.startHp,
+      armor: CONFIG.player.startArmor,
+      xp: 0,
+      xpNext: 25,
+      level: 1,
+      materials: 0,
+      kills: 0,
+      damage: CONFIG.player.damage,
+      fireCooldown: CONFIG.player.fireCooldown,
+      weapons: CONFIG.player.weapons,
+      speed: CONFIG.player.moveSpeed,
+      fireTimer: 0,
+      paused: false,
+      gameOver: false,
+      enemyDir: 1
+    };
+
+    const shopCosts = {
+      weapon: 65,
+      damage: 40,
+      fireRate: 45,
+      armor: 50,
+      heal: 30
+    };
+
+    let enemies = [];
+    let playerBullets = [];
+    let enemyBullets = [];
+    let pickups = [];
+    let particles = [];
+    let activeBoss = null;
+
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ==========================================
+    // 4. ENEMY & MINI-BOSS SPAWNING
+    // ==========================================
+    function spawnWave(waveNum) {
+      // Clear leftover entities
+      enemies.forEach(e => scene.remove(e.mesh));
+      playerBullets.forEach(b => scene.remove(b.mesh));
+      enemyBullets.forEach(b => scene.remove(b.mesh));
+      enemies = [];
+      playerBullets = [];
+      enemyBullets = [];
+      activeBoss = null;
+      document.getElementById('boss-hud').style.display = 'none';
+
+      state.waveTime = 25 + Math.min(20, waveNum * 2);
+      state.enemyDir = 1;
+
+      const rows = Math.min(5, 3 + Math.floor(waveNum / 2));
+      const cols = Math.min(9, 6 + Math.floor(waveNum / 2));
+      const hpScale = Math.floor(CONFIG.enemies.baseHp * Math.pow(CONFIG.enemies.hpGrowthPerWave, waveNum - 1));
+
+      const spacingX = 3.1;
+      const spacingZ = 2.8;
+      const startX = -((cols - 1) * spacingX) / 2;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const isHeavy = r === 0 && waveNum >= 2;
+          const maxHp = isHeavy ? Math.floor(hpScale * 2.2) : hpScale;
+          const color = isHeavy ? 0xa855f7 : (r === 1 ? 0xf97316 : 0xff2a55);
+
+          const mesh = new THREE.Mesh(
+            isHeavy ? new THREE.OctahedronGeometry(1.05, 0) : new THREE.BoxGeometry(1.5, 0.9, 1.3),
+            new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25 })
+          );
+          mesh.position.set(startX + c * spacingX, 0, CONFIG.map.spawnZ + r * spacingZ);
+          scene.add(mesh);
+
+          enemies.push({
+            mesh,
+            hp: maxHp,
+            maxHp,
+            isBoss: false,
+            matDrop: isHeavy ? 6 : 3,
+            xpDrop: isHeavy ? 10 : 5
+          });
+        }
+      }
+
+      // Spawn Mini-Boss every 3rd wave
+      if (waveNum % CONFIG.enemies.bossWaveInterval === 0) {
+        const banner = document.getElementById('warning-banner');
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 2500);
+
+        const bossHp = hpScale * CONFIG.enemies.bossHpMultiplier;
+        const bossMesh = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(2.4, 0),
+          new THREE.MeshStandardMaterial({ color: 0xd946ef, emissive: 0x701a75, roughness: 0.2 })
+        );
+        bossMesh.position.set(0, 0.5, CONFIG.map.spawnZ - 3.5);
+        scene.add(bossMesh);
+
+        activeBoss = {
+          mesh: bossMesh,
+          hp: bossHp,
+          maxHp: bossHp,
+          isBoss: true,
+          matDrop: 45,
+          xpDrop: 50
+        };
+        enemies.push(activeBoss);
+        document.getElementById('boss-hud').style.display = 'block';
+        document.getElementById('boss-bar').style.width = '100%';
+      }
+
+      updateHUD();
+    }
+
+    // ==========================================
+    // 5. COMBAT, DROPS & EXPLOSIONS
+    // ==========================================
+    function firePlayerLasers() {
+      const spread = 0.65;
+      const totalW = (state.weapons - 1) * spread;
+      const startX = playerGroup.position.x - totalW / 2;
+
+      for (let i = 0; i < state.weapons; i++) {
+        const bMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.18, 0.18, 1.1),
+          new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+        );
+        bMesh.position.set(startX + i * spread, 0, playerGroup.position.z - 1.4);
+        scene.add(bMesh);
+        playerBullets.push({ mesh: bMesh, dmg: state.damage });
+      }
+    }
+
+    function spawnExplosion(pos, color, count = 8) {
+      for (let i = 0; i < count; i++) {
+        const pMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.25, 0.25, 0.25),
+          new THREE.MeshBasicMaterial({ color })
+        );
+        pMesh.position.copy(pos);
+        scene.add(pMesh);
+        particles.push({
+          mesh: pMesh,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 12, Math.random() * 6, (Math.random() - 0.5) * 12),
+          life: 0.45
+        });
+      }
+    }
+
+    function spawnPickup(pos, matVal, xpVal) {
+      const pMesh = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.45, 0),
+        new THREE.MeshBasicMaterial({ color: 0xffd700 })
+      );
+      pMesh.position.copy(pos);
+      scene.add(pMesh);
+      pickups.push({ mesh: pMesh, matVal, xpVal });
+    }
+
+    function damagePlayer(rawDmg) {
+      const mitigated = Math.max(2, rawDmg - state.armor);
+      state.hp = Math.max(0, state.hp - mitigated);
+      spawnExplosion(playerGroup.position, 0xff2a55, 10);
+      updateHUD();
+      if (state.hp <= 0) triggerGameOver();
+    }
+
+    function gainXP(amount) {
+      state.xp += amount;
+      if (state.xp >= state.xpNext) {
+        state.xp -= state.xpNext;
+        state.level++;
+        state.xpNext = Math.floor(state.xpNext * 1.35);
+        openLevelUpModal();
+      }
+    }
+
+    // ==========================================
+    // 6. LEVEL-UP & EXPENSIVE SHOP MODALS
+    // ==========================================
+    function openLevelUpModal() {
+      state.paused = true;
+      const modal = document.getElementById('levelup-modal');
+      const container = document.getElementById('levelup-options');
+      container.innerHTML = '';
+
+      const choices = [
+        { title: '+6 Max HP & Heal', desc: 'Reinforce ship hull integrity', apply: () => { state.maxHp += 6; state.hp = Math.min(state.maxHp, state.hp + 12); } },
+        { title: '+3 Laser Damage', desc: 'Higher plasma bolt output', apply: () => { state.damage += 3; } },
+        { title: '+7% Fire Rate', desc: 'Faster weapon cycling', apply: () => { state.fireCooldown = Math.max(0.08, state.fireCooldown * 0.93); } },
+        { title: '+1 Armor Plating', desc: 'Reduce incoming hit damage', apply: () => { state.armor += 1; } }
+      ];
+
+      choices.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'upgrade-card';
+        btn.innerHTML = `<div class="card-title">${c.title}</div><div class="card-desc">${c.desc}</div>`;
+        btn.onclick = () => {
+          c.apply();
+          modal.style.display = 'none';
+          state.paused = false;
+          updateHUD();
+        };
+        container.appendChild(btn);
+      });
+
+      modal.style.display = 'flex';
+    }
+
+    function openShopModal() {
+      state.paused = true;
+      const modal = document.getElementById('shop-modal');
+      document.getElementById('next-wave-btn').textContent = `START WAVE ${state.wave + 1}`;
+      renderShopCards();
+      modal.style.display = 'flex';
+    }
+
+    function renderShopCards() {
+      document.getElementById('shop-mat-text').textContent = `Materials Available: ${state.materials}`;
+      const container = document.getElementById('shop-options');
+      container.innerHTML = '';
+
+      const items = [
+        {
+          title: `Extra Cannon (${state.weapons}/${CONFIG.player.maxWeapons})`,
+          desc: 'Add +1 parallel laser barrel',
+          cost: shopCosts.weapon,
+          disabled: state.weapons >= CONFIG.player.maxWeapons || state.materials < shopCosts.weapon,
+          buy: () => {
+            state.materials -= shopCosts.weapon;
+            state.weapons++;
+            shopCosts.weapon = Math.floor(shopCosts.weapon * 2.15);
+          }
+        },
+        {
+          title: 'Heavy Coils (+6 DMG)',
+          desc: 'Increases base laser damage',
+          cost: shopCosts.damage,
+          disabled: state.materials < shopCosts.damage,
+          buy: () => {
+            state.materials -= shopCosts.damage;
+            state.damage += 6;
+            shopCosts.damage = Math.floor(shopCosts.damage * 1.65);
+          }
+        },
+        {
+          title: 'Overclock (+12% Fire Rate)',
+          desc: 'Reduces laser cooldown',
+          cost: shopCosts.fireRate,
+          disabled: state.materials < shopCosts.fireRate,
+          buy: () => {
+            state.materials -= shopCosts.fireRate;
+            state.fireCooldown = Math.max(0.08, state.fireCooldown * 0.88);
+            shopCosts.fireRate = Math.floor(shopCosts.fireRate * 1.75);
+          }
+        },
+        {
+          title: 'Titanium Plating (+2 Armor)',
+          desc: 'Flat damage reduction per hit',
+          cost: shopCosts.armor,
+          disabled: state.materials < shopCosts.armor,
+          buy: () => {
+            state.materials -= shopCosts.armor;
+            state.armor += 2;
+            shopCosts.armor = Math.floor(shopCosts.armor * 1.8);
+          }
+        },
+        {
+          title: 'Hull Nanobots (+30 HP)',
+          desc: 'Repair damaged ship armor',
+          cost: shopCosts.heal,
+          disabled: state.materials < shopCosts.heal || state.hp >= state.maxHp,
+          buy: () => {
+            state.materials -= shopCosts.heal;
+            state.hp = Math.min(state.maxHp, state.hp + 30);
+            shopCosts.heal = Math.floor(shopCosts.heal * 1.4);
+          }
+        }
+      ];
+
+      items.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'upgrade-card';
+        btn.disabled = item.disabled;
+        btn.innerHTML = `
+          <div class="card-title">${item.title}</div>
+          <div class="card-desc">${item.desc}</div>
+          <div class="card-cost">${item.disabled && item.title.includes('6/6') ? 'MAXED' : item.cost + ' Materials'}</div>
+        `;
+        btn.onclick = () => {
+          item.buy();
+          updateHUD();
+          renderShopCards();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    document.getElementById('next-wave-btn').onclick = () => {
+      document.getElementById('shop-modal').style.display = 'none';
+      state.wave++;
+      state.paused = false;
+      spawnWave(state.wave);
+    };
+
+    function triggerGameOver() {
+      state.gameOver = true;
+      document.getElementById('gameover-stats').textContent = `Survived to Wave ${state.wave} | Total Kills: ${state.kills}`;
+      document.getElementById('gameover-modal').style.display = 'flex';
+    }
+
+    function updateHUD() {
+      document.getElementById('hp-text').textContent = `HP: ${state.hp}/${state.maxHp} | Armor: ${state.armor}`;
+      document.getElementById('hp-bar').style.width = `${(state.hp / state.maxHp) * 100}%`;
+      document.getElementById('xp-text').textContent = `LEVEL ${state.level} (${state.xp}/${state.xpNext} XP)`;
+      document.getElementById('xp-bar').style.width = `${(state.xp / state.xpNext) * 100}%`;
+      document.getElementById('mat-text').textContent = `Materials: ${state.materials}`;
+      document.getElementById('wave-title').textContent = `NIGHTMARE WAVE ${state.wave}`;
+      document.getElementById('wave-timer').textContent = Math.ceil(state.waveTime);
+      document.getElementById('weapons-text').textContent = `${state.weapons}/${CONFIG.player.maxWeapons}`;
+      document.getElementById('alive-text').textContent = enemies.length;
+      document.getElementById('kills-text').textContent = state.kills;
+
+      if (activeBoss && activeBoss.hp > 0) {
+        document.getElementById('boss-bar').style.width = `${(activeBoss.hp / activeBoss.maxHp) * 100}%`;
+      }
+    }
+
+    // ==========================================
+    // 7. MAIN 60FPS GAME LOOP
+    // ==========================================
+    let lastTime = performance.now();
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      starField.rotation.y += dt * 0.02;
+
+      if (state.paused || state.gameOver) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // Wave Countdown
+      state.waveTime -= dt;
+      if (state.waveTime <= 0 && enemies.length > 0) {
+        damagePlayer(999); // Time ran out before clearing wave
+      }
+
+      // Player Movement
+      const halfBound = CONFIG.map.width / 2 - 1.8;
+      if ((keys['ArrowLeft'] || keys['KeyA']) && playerGroup.position.x > -halfBound) {
+        playerGroup.position.x -= state.speed * dt;
+        playerGroup.rotation.z = 0.22;
+      } else if ((keys['ArrowRight'] || keys['KeyD']) && playerGroup.position.x < halfBound) {
+        playerGroup.position.x += state.speed * dt;
+        playerGroup.rotation.z = -0.22;
+      } else {
+        playerGroup.rotation.z *= 0.85;
+      }
+
+      // Auto-Fire Lasers
+      state.fireTimer -= dt;
+      if (state.fireTimer <= 0 && enemies.length > 0) {
+        state.fireTimer = state.fireCooldown;
+        firePlayerLasers();
+      }
+
+      // Update Player Bullets
+      for (let i = playerBullets.length - 1; i >= 0; i--) {
+        const b = playerBullets[i];
+        b.mesh.position.z -= 42 * dt;
+        if (b.mesh.position.z < -CONFIG.map.depth / 2 - 4) {
+          scene.remove(b.mesh);
+          playerBullets.splice(i, 1);
+          continue;
+        }
+
+        // Check Enemy Hit
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
+          const hitRadius = e.isBoss ? 2.5 : 1.15;
+          if (b.mesh.position.distanceTo(e.mesh.position) < hitRadius) {
+            e.hp -= b.dmg;
+            spawnExplosion(b.mesh.position, 0x00f0ff, 3);
+            scene.remove(b.mesh);
+            playerBullets.splice(i, 1);
+
+            if (e.hp <= 0) {
+              spawnExplosion(e.mesh.position, e.isBoss ? 0xd946ef : 0xff2a55, e.isBoss ? 25 : 10);
+              spawnPickup(e.mesh.position, e.matDrop, e.xpDrop);
+              if (e.isBoss) {
+                activeBoss = null;
+                document.getElementById('boss-hud').style.display = 'none';
+              }
+              scene.remove(e.mesh);
+              enemies.splice(j, 1);
+              state.kills++;
+            }
+            break;
+          }
+        }
+      }
+
+      // Update Enemies
+      const enemySpeed = CONFIG.enemies.baseSpeed + (state.wave * CONFIG.enemies.speedGrowthPerWave);
+      let hitWall = false;
+
+      enemies.forEach(e => {
+        e.mesh.position.x += state.enemyDir * enemySpeed * dt;
+        e.mesh.rotation.y += dt * 1.5;
+
+        if (Math.abs(e.mesh.position.x) > halfBound) hitWall = true;
+
+        // Enemy Return Fire
+        const fireRate = (CONFIG.enemies.fireChancePerSec + state.wave * 0.04) * (e.isBoss ? 3.5 : 1);
+        if (Math.random() < fireRate * dt) {
+          const ebMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(e.isBoss ? 0.45 : 0.28, 8, 8),
+            new THREE.MeshBasicMaterial({ color: e.isBoss ? 0xd946ef : 0xff3b5c })
+          );
+          ebMesh.position.copy(e.mesh.position);
+          scene.add(ebMesh);
+          enemyBullets.push({
+            mesh: ebMesh,
+            dmg: CONFIG.enemies.baseDamage + state.wave * 3,
+            speed: CONFIG.enemies.bulletSpeed + state.wave * 0.8
+          });
+        }
+      });
+
+      if (hitWall) {
+        state.enemyDir *= -1;
+        enemies.forEach(e => {
+          e.mesh.position.z += 1.6;
+          if (e.mesh.position.z >= CONFIG.map.playerZ - 1.5) {
+            damagePlayer(999);
+          }
+        });
+      }
+
+      // Update Enemy Bullets
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const eb = enemyBullets[i];
+        eb.mesh.position.z += eb.speed * dt;
+
+        if (eb.mesh.position.distanceTo(playerGroup.position) < 1.3) {
+          damagePlayer(eb.dmg);
+          scene.remove(eb.mesh);
+          enemyBullets.splice(i, 1);
+          continue;
+        }
+
+        if (eb.mesh.position.z > CONFIG.map.depth / 2 + 4) {
+          scene.remove(eb.mesh);
+          enemyBullets.splice(i, 1);
+        }
+      }
+
+      // Update Magnetic Crystal Pickups
+      for (let i = pickups.length - 1; i >= 0; i--) {
+        const p = pickups[i];
+        p.mesh.rotation.y += dt * 3;
+        p.mesh.position.z += 6 * dt;
+
+        const dist = p.mesh.position.distanceTo(playerGroup.position);
+        if (dist < CONFIG.player.pickupRange) {
+          p.mesh.position.lerp(playerGroup.position, dt * 8);
+        }
+
+        if (dist < 1.5) {
+          state.materials += p.matVal;
+          gainXP(p.xpVal);
+          scene.remove(p.mesh);
+          pickups.splice(i, 1);
+          continue;
+        }
+
+        if (p.mesh.position.z > CONFIG.map.depth / 2 + 4) {
+          scene.remove(p.mesh);
+          pickups.splice(i, 1);
+        }
+      }
+
+      // Update Explosion Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.mesh.position.addScaledVector(pt.vel, dt);
+        pt.life -= dt;
+        pt.mesh.scale.setScalar(Math.max(0.01, pt.life * 2));
+        if (pt.life <= 0) {
+          scene.remove(pt.mesh);
+          particles.splice(i, 1);
+        }
+      }
+
+      updateHUD();
+
+      // Check Wave Cleared
+      if (enemies.length === 0 && !state.gameOver) {
+        openShopModal();
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Launch Wave 1
+    spawnWave(1);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
